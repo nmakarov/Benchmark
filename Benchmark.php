@@ -1,6 +1,22 @@
 <?php
+/**
+ * 
+ * @author Nick Makarov <nmakarov@gmail.com>
+ * @link http://github/nmakarov
+ * @copyright Copyright &copy; 2012 Nick Makarov
+ * @license http://www.opensource.org/licenses/bsd-license.php
+ * @version $Id$
+ * @package ext.Benchmark
+ */
 
 /**
+ * Short usage:
+ * 
+ * Benchmark.php has to be in protected/extentions/.
+ * 
+ * including:
+ * Yii::import('ext.Benchmark');
+ * 
  * Geting an instance:
  * 	$bench = Benchmark::getInstance();
  * 
@@ -28,6 +44,8 @@ class Benchmark extends CComponent
 	private $_marks = array();
 	private $_current_mark = NULL;
 
+	private $_locked = array();
+
 	// singleton instance
 	static $instance = NULL;
 
@@ -47,7 +65,7 @@ class Benchmark extends CComponent
 	}
 
 	/**
-	 * If kaput() was not called properly, it will be called here:
+	 * If kaput() was not called explicitly, it will be called here:
 	 */
 	public function __destruct()
 	{
@@ -56,6 +74,8 @@ class Benchmark extends CComponent
 
 	/**
 	 * starts the benchmarking iteration
+	 * 
+	 *@param string $name Whatever the testing should be called
 	 */
 	public function start($name)
 	{
@@ -122,9 +142,12 @@ class Benchmark extends CComponent
 
 	/**
 	 * The most important function - mark the beginning of something
-	 * @param a short description of what's going on
+	 * @param STRING $mark
+	 * 	A short description of what's going on
+	 * @param STRING $extra
+	 * 	Some text to be appended to the mark (and not be used for grouping)
 	 */
-	public function mark($what, $extra='')
+	public function mark($mark, $extra='')
 	{
 		// finalize old mark (if any)
 		$this->cutoff();
@@ -132,18 +155,18 @@ class Benchmark extends CComponent
 		// start a new one
 
 		// prepare the results array for the current mark, if needed
-		if ( ! array_key_exists($what, $this->_marks))
+		if ( ! array_key_exists($mark, $this->_marks))
 		{
-			$this->_marks[$what] = array(
+			$this->_marks[$mark] = array(
 				'count' => 0,
 				'times' => array(),
 			);
 		}
 
 		// mark a start time and a name of the active benchmark
-		$this->_marks[$what]['start'] = microtime(TRUE);
-		$this->_marks[$what]['extra'] = $extra ? " $extra" : '';
-		$this->_current_mark = $what;
+		$this->_marks[$mark]['start'] = microtime(TRUE);
+		$this->_marks[$mark]['extra'] = $extra ? " $extra" : '';
+		$this->_current_mark = $mark;
 
 		return TRUE;
 	}
@@ -177,6 +200,10 @@ class Benchmark extends CComponent
 		return FALSE;
 	}
 
+	/**
+	 * @return STRING 
+	 *  a two-row text indicating a memory usage
+	 */
 	private function mem_usage()
 	{
 		$o = '';
@@ -189,6 +216,11 @@ class Benchmark extends CComponent
 		return $o;
 	}
 
+	/**
+	 * Just a little helper
+	 * @param INTEGER $s a size of something in bytes
+	 * @return STRING formatted size in GB, MB or KB
+	 */
 	public function format_size($s)
 	{
 		if ($s>1024*1024*1024)
@@ -200,7 +232,19 @@ class Benchmark extends CComponent
 
 	}
 
-	public function save($folder)
+	public function lock_marks()
+	{
+		$this->_locked = array_keys($this->_marks);
+	}
+
+	/**
+	 * Save the full history of benchmarks to a specific folder
+	 * A filename would be created accordingly
+	 * @param STRING $folder - where to save serialized marks. 
+	 * @param STRING $extra - a small token to include in the file
+	 * Usually, '/tmp' is sufficient
+	 */
+	public function save($folder, $extra='')
 	{
 		if ( ! is_writable($folder))
 		{
@@ -209,10 +253,16 @@ class Benchmark extends CComponent
 
 		$this->cutoff();
 
-		$file = $folder . '/saved_marks_' . getmypid() . '.txt';
+		$file = $folder . "/saved_marks{$extra}_" . getmypid() . '.txt';
 		file_put_contents($file, serialize($this->_marks));
 	}
 
+	/**
+	 * Load serialized marks from all special files in the folder
+	 * and merge them back to the internal 'marks' array
+	 * only the new marks will be extracted from each file.
+	 * @param STRING folder - where to save serialized marks. 
+	 */
 	public function load($folder)
 	{
 		if ( ! is_readable($folder))
@@ -228,6 +278,13 @@ class Benchmark extends CComponent
 
 			foreach ($marks as $mark=>$data)
 			{
+				// do not merge 'locked' marks
+				if (in_array($mark, $this->_locked))
+				{
+					continue;
+				}
+
+				// is it an unseen (yet) mark?
 				if ( ! array_key_exists($mark, $this->_marks))
 				{
 					$this->_marks[$mark] = array(
@@ -236,6 +293,7 @@ class Benchmark extends CComponent
 					);
 				}
 
+				// merge mark
 				$this->_marks[$mark]['count'] += $data['count'];
 				$this->_marks[$mark]['times'] = array_merge(
 					$this->_marks[$mark]['times'],
@@ -243,6 +301,7 @@ class Benchmark extends CComponent
 				);
 			}
 
+			// file is not needed anymore.
 			unlink($file);
 		}
 	}
