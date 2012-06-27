@@ -13,6 +13,8 @@ For me usable info is:
 * how long each operation goes (with brief description)
 * grouped totals - how many time each op run and, total execution time and average execution time per operation
 
+Detailed description and usage may be found here: <a href="http://www.yiiframework.com/extension/benchmark/">http://www.yiiframework.com/extension/benchmark/</a>
+
 ## Installation and configuration
 
 Just download the script from http::github.com/nmakarov/Benchmark,
