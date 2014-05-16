@@ -3,6 +3,8 @@ Benchmark
 
 Very simple yet useful benchmarking/logging class to be used in Yii framework. Since it uses no Yii-specific stuff, it is suitable for any other framework.
 
+Detailed description is here: <a href="http://www.yiiframework.com/extension/benchmark/">http://www.yiiframework.com/extension/benchmark/</a>
+
 For me it is always annoying to look at the logs and see each line begins with 
 
 ```php
